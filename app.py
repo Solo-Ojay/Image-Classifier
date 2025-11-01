@@ -6,9 +6,11 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 import io
+import urllib.request
+import zipfile
+from pathlib import Path
+import shutil
 
-# model_path = r'C:\Users\Hp\Documents\MCE411 Assignment\best_model.h5'
-# data_dir = r'C:\Users\Hp\Documents\MCE411 Assignment\paddy-doctor-diseases-small-augmented-26k'
 @st.cache_resource
 def load_model(model_path: str):
     """Load and return a Keras model from disk."""
@@ -58,6 +60,60 @@ def main():
     st.sidebar.markdown("Provide class names (one per line) to override inferred names:")
     classes_text = st.sidebar.text_area("Class names (optional)")
 
+    # --- Optional remote resources (download model or demo images) ---
+    st.sidebar.markdown("### Remote resources (optional)")
+    model_url = st.sidebar.text_input("Model download URL (.h5)", value="")
+    demo_zip_url = st.sidebar.text_input("Demo images zip URL (optional)", value="")
+
+    # prepare local folders
+    workspace_root = Path.cwd()
+    models_dir = workspace_root / "models"
+    demo_dir = workspace_root / "demo_images"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    demo_dir.mkdir(parents=True, exist_ok=True)
+
+    def download_file(url: str, dest: Path) -> bool:
+        """Download URL to dest path. Returns True on success."""
+        try:
+            with urllib.request.urlopen(url) as resp, open(dest, 'wb') as out_file:
+                shutil.copyfileobj(resp, out_file)
+            return True
+        except Exception as e:
+            st.sidebar.error(f"Download failed: {e}")
+            return False
+
+    def download_and_extract_zip(url: str, dest_dir: Path) -> bool:
+        tmp_zip = dest_dir / "_tmp_download.zip"
+        ok = download_file(url, tmp_zip)
+        if not ok:
+            return False
+        try:
+            with zipfile.ZipFile(tmp_zip, 'r') as z:
+                z.extractall(dest_dir)
+            tmp_zip.unlink()
+            return True
+        except Exception as e:
+            st.sidebar.error(f"Failed to extract zip: {e}")
+            return False
+
+    # Buttons to download resources
+    if model_url:
+        if st.sidebar.button("Download model from URL"):
+            dest_model = models_dir / os.path.basename(model_url.split('?')[0])
+            st.sidebar.info(f"Downloading model to {dest_model}")
+            if download_file(model_url, dest_model):
+                st.sidebar.success("Model downloaded")
+                # set the model_path to downloaded file for this run
+                model_path = str(dest_model)
+
+    if demo_zip_url:
+        if st.sidebar.button("Download demo images zip"):
+            st.sidebar.info(f"Downloading demo images to {demo_dir}")
+            if download_and_extract_zip(demo_zip_url, demo_dir):
+                st.sidebar.success("Demo images downloaded and extracted")
+                # set the data_dir to demo_dir for this run
+                data_dir = str(demo_dir)
+
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
     top_k = st.sidebar.slider("Top K", min_value=1, max_value=5, value=3)
 
@@ -79,19 +135,33 @@ def main():
         return results
 
     if use_demo:
-        demo_images = list_demo_images(data_dir)
-        if not demo_images:
-            st.sidebar.warning("No demo images found in dataset directory. Check Dataset directory setting.")
+        # Validate dataset directory first
+        if not data_dir or not os.path.isdir(data_dir):
+            st.sidebar.error("Dataset directory not found. Please update the Dataset directory setting to a valid path.")
             use_demo = False
+            demo_images = []
         else:
-            # show a shorter label for readability
-            demo_labels = [os.path.relpath(p, data_dir) for p in demo_images]
-            demo_choice = st.sidebar.selectbox("Choose demo image", demo_labels)
-            if demo_choice:
-                # compute full path
-                demo_file_path = os.path.join(data_dir, demo_choice)
-                # normalize path
-                demo_file_path = os.path.normpath(demo_file_path)
+            # Allow narrowing to a class subfolder for convenience
+            class_folders = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+            class_folders.sort()
+            chosen_class = st.sidebar.selectbox("(Optional) Limit to class folder", ["All classes"] + class_folders)
+
+            # compute root for images listing
+            root_for_images = data_dir if chosen_class == "All classes" else os.path.join(data_dir, chosen_class)
+            demo_images = list_demo_images(root_for_images)
+
+            if not demo_images:
+                st.sidebar.warning("No demo images found in the selected dataset path. Try a different Dataset directory or class folder.")
+                use_demo = False
+            else:
+                # show a shorter label for readability
+                demo_labels = [os.path.relpath(p, data_dir) for p in demo_images]
+                demo_choice = st.sidebar.selectbox("Choose demo image", demo_labels)
+                if demo_choice:
+                    # compute full path
+                    demo_file_path = os.path.join(data_dir, demo_choice)
+                    # normalize path
+                    demo_file_path = os.path.normpath(demo_file_path)
 
     # If neither uploaded file nor demo chosen, prompt the user
     if (not uploaded_file) and (not demo_file_path):
