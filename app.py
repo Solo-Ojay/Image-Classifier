@@ -62,7 +62,6 @@ def main():
 
     # --- Optional remote resources (download model or demo images) ---
     st.sidebar.markdown("### Remote resources (optional)")
-    model_url = st.sidebar.text_input("Model download URL (.h5)", value="")
     demo_zip_url = st.sidebar.text_input("Demo images zip URL (optional)", value="")
 
     # prepare local folders
@@ -96,23 +95,54 @@ def main():
             st.sidebar.error(f"Failed to extract zip: {e}")
             return False
 
-    # Buttons to download resources
-    if model_url:
-        if st.sidebar.button("Download model from URL"):
-            dest_model = models_dir / os.path.basename(model_url.split('?')[0])
-            st.sidebar.info(f"Downloading model to {dest_model}")
-            if download_file(model_url, dest_model):
-                st.sidebar.success("Model downloaded")
-                # set the model_path to downloaded file for this run
-                model_path = str(dest_model)
+    # If a default model exists in models/, prefer it and make it the only model
+    default_model_file = models_dir / "best_model.h5"
+    use_default_model = False
+    if default_model_file.exists():
+        # force using the bundled default model
+        use_default_model = st.sidebar.checkbox("Use repository default model (models/best_model.h5)", value=True)
+        if use_default_model:
+            model_path = str(default_model_file)
+            st.sidebar.info(f"Using default model: {default_model_file}")
+        else:
+            # if user unchecks, allow other model inputs below
+            pass
 
-    if demo_zip_url:
-        if st.sidebar.button("Download demo images zip"):
-            st.sidebar.info(f"Downloading demo images to {demo_dir}")
-            if download_and_extract_zip(demo_zip_url, demo_dir):
-                st.sidebar.success("Demo images downloaded and extracted")
-                # set the data_dir to demo_dir for this run
-                data_dir = str(demo_dir)
+    # When default model is not used, show model download/upload controls
+    if not use_default_model:
+        model_url = st.sidebar.text_input("Model download URL (.h5)", value="")
+
+        # Buttons to download resources
+        if model_url:
+            if st.sidebar.button("Download model from URL"):
+                dest_model = models_dir / os.path.basename(model_url.split('?')[0])
+                st.sidebar.info(f"Downloading model to {dest_model}")
+                if download_file(model_url, dest_model):
+                    st.sidebar.success("Model downloaded")
+                    # set the model_path to downloaded file for this run
+                    model_path = str(dest_model)
+
+        if demo_zip_url:
+            if st.sidebar.button("Download demo images zip"):
+                st.sidebar.info(f"Downloading demo images to {demo_dir}")
+                if download_and_extract_zip(demo_zip_url, demo_dir):
+                    st.sidebar.success("Demo images downloaded and extracted")
+                    # set the data_dir to demo_dir for this run
+                    data_dir = str(demo_dir)
+
+        # Allow uploading a model file directly via the sidebar (useful for deployed apps)
+        model_upload = st.sidebar.file_uploader("Upload model file (.h5)", type=["h5", "keras", "hdf5"]) 
+        if model_upload is not None:
+            try:
+                upload_name = getattr(model_upload, 'name', 'uploaded_model.h5')
+                dest_model = models_dir / upload_name
+                # write bytes to disk
+                with open(dest_model, 'wb') as f:
+                    f.write(model_upload.read())
+                st.sidebar.success(f"Model uploaded and saved to {dest_model}")
+                model_path = str(dest_model)
+            except Exception as e:
+                st.sidebar.error(f"Failed to save uploaded model: {e}")
 
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
     top_k = st.sidebar.slider("Top K", min_value=1, max_value=5, value=3)
