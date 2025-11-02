@@ -27,7 +27,7 @@ def main():
     st.title("🌾 Paddy Rice Disease Classifier")
 
     # Paths relative to repo root
-    model_path = Path("models/best_model.h5")
+    model_path = Path("best_model.h5")
     demo_dir = Path("demo_images")
 
     if not model_path.exists():
