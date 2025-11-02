@@ -45,7 +45,7 @@ def main():
 
     # Relative paths (works in Streamlit Cloud)
     default_model = str(Path(__file__).parent / "best_model.h5")
-    default_data_dir = "paddy-doctor-diseases-small-augmented-26k"
+    default_data_dir = str(Path(__file__).parent / "paddy-doctor-diseases-small-augmented-26k")
 
     model_path = st.sidebar.text_input("Model path", default_model)
     data_dir = st.sidebar.text_input("Dataset directory (optional, to infer class names)", default_data_dir)
