@@ -44,8 +44,8 @@ def main():
     st.sidebar.header("Settings")
 
     # Relative paths (works in Streamlit Cloud)
-    default_model = "best_model.h5"
-    default_data_dir = "paddy-doctor-diseases-small-augmented-26k"
+    default_model = r"C:\Users\Hp\Documents\MCE411 Assignment\best_model.h5"
+    default_data_dir = r"C:\Users\Hp\Documents\MCE411 Assignment\paddy-doctor-diseases-small-augmented-26k"
 
     model_path = st.sidebar.text_input("Model path", default_model)
     data_dir = st.sidebar.text_input("Dataset directory (optional, to infer class names)", default_data_dir)
