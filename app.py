@@ -28,7 +28,8 @@ def main():
 
     # Paths relative to repo root
     model_path = Path("best_model.h5")
-    demo_dir = Path("demo_images")
+    demo_dir = Path("paddy-doctor-diseases-small-augmented-26k")
+
 
     if not model_path.exists():
         st.error("Model file not found. Please make sure 'models/best_model.h5' is in your repo.")
